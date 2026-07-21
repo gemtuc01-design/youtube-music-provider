@@ -2,7 +2,7 @@
 
 ExtensiÃ³n que agrega **YouTube Music** como fuente de bÃºsqueda, metadata y descarga en [SpotiFLAC Mobile](https://spotiflac.zarz.moe/). Busca temas, resuelve links de YT/YT Music y descarga el audio directamente desde la app.
 
-![version](https://img.shields.io/badge/version-0.1.0-blue) ![type](https://img.shields.io/badge/type-metadata%20%2B%20download-green) ![minApp](https://img.shields.io/badge/minAppVersion-3.0.1-orange)
+![version](https://img.shields.io/badge/version-0.1.6-blue) ![type](https://img.shields.io/badge/type-metadata%20%2B%20download-green) ![minApp](https://img.shields.io/badge/minAppVersion-3.0.6-orange)
 
 ---
 
