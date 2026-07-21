@@ -20,8 +20,6 @@ function cleanup() {
   return { success: true };
 }
 
-
-
 function ytmContext(cfg) {
   return {
     client: {
@@ -60,7 +58,7 @@ function getYtcfg() {
 
   if (!key || !ver) {
     if (settings.debug) console.log("[ytmusic] no pude scrapear ytcfg");
-    // 3. Usamos una versión REAL y validada por YouTube, no una inventada
+    // 3. Usamos una versión REAL y validada por YouTube
     return { key: null, clientVersion: "1.20240513.01.00" };
   }
 
@@ -69,36 +67,20 @@ function getYtcfg() {
   if (settings.debug) console.log("[ytmusic] ytcfg ok", ver);
   return cfg;
 }
+
+// -------------------------------------------------------------
 // SEARCH (barra de búsqueda custom) - CON DEBUG EN RESULTADOS
 // -------------------------------------------------------------
 function customSearch(query, options) {
   const cfg = getYtcfg();
-  const url = cfg.key
-    ? `${YTM_BASE}/search?key=${cfg.key}&prettyPrint=false`
-    : `${YTM_BASE}/search?prettyPrint=false`; // InnerTube banca sin key
-
-  const res = http.post(url, {
-    headers: {
-      "Content-Type": "application/json",
-      "Origin": YTM_HOST,
-      "Referer": `${YTM_HOST}/`,
-      "X-YouTube-Client-Name": "67",
-      "X-YouTube-Client-Version": cfg.clientVersion
-    },
-    body: JSON.stringify({
-      context: ytmContext(cfg),
-      query: query,
-      params: "EgWKAQIIAWoKEAkQBRAKEAMQBA%3D%3D" // filtro Songs
-    })
-  });
-
-  // 1. Si YouTube rechaza la conexión, mostramos el código HTTP
-  if (res.status !== 200) {
-    storage.remove("ytcfg"); // limpiá cache para reintentar limpio
+  
+  // Validamos si la clave se obtuvo correctamente
+  if (!cfg.key) {
+    storage.remove("ytcfg");
     return [{
-      id: "error_http",
-      name: "Error HTTP de YouTube: " + res.status,
-      artists: "Intenta buscar de nuevo (caché limpiado)",
+      id: "error_nokey",
+      name: "Fallo al obtener API Key",
+      artists: "Revisa el scraping de getYtcfg",
       album_name: "",
       duration_ms: 0,
       cover_url: "",
@@ -106,30 +88,55 @@ function customSearch(query, options) {
     }];
   }
 
-  // 2. Si la conexión es exitosa pero falla al leer los datos de YouTube
+  const url = `${YTM_BASE}/search?key=${cfg.key}&prettyPrint=false`;
+
+  const res = http.post(url, {
+    headers: {
+      "Content-Type": "application/json",
+      "Origin": YTM_HOST,
+      "Referer": `${YTM_HOST}/`,
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      "X-YouTube-Client-Name": "67",
+      "X-YouTube-Client-Version": cfg.clientVersion
+    },
+    body: JSON.stringify({
+      context: ytmContext(cfg),
+      query: query,
+      // Corregimos el parámetro de búsqueda para evitar el error 400
+      params: "EgWKAQIIAWoKEAkQBRAKEAMQBA==" 
+    })
+  });
+
+  if (res.status !== 200) {
+    storage.remove("ytcfg");
+    return [{
+      id: "error_http",
+      name: "Error HTTP de YouTube: " + res.status,
+      artists: "Bloqueado en la petición POST",
+      album_name: "",
+      duration_ms: 0,
+      cover_url: "",
+      item_type: "track"
+    }];
+  }
+
   try {
     const data = JSON.parse(res.body);
     const results = extractSearchItems(data).map(parseSongItem).filter(Boolean);
-    
-    // 3. Si YouTube no devolvió error, pero nuestra función no encontró canciones
-    if (results.length === 0) {
-       return [{
-          id: "error_empty",
-          name: "Resultados vacíos",
-          artists: "¿YouTube cambió el diseño HTML?",
-          album_name: "",
-          duration_ms: 0,
-          cover_url: "",
-          item_type: "track"
-       }];
-    }
-    
-    return results;
+    return results.length > 0 ? results : [{
+      id: "error_empty",
+      name: "Resultados vacíos",
+      artists: "¿YouTube cambió el diseño?",
+      album_name: "",
+      duration_ms: 0,
+      cover_url: "",
+      item_type: "track"
+    }];
   } catch (e) {
     return [{
       id: "error_parse",
-      name: "Error en el código: " + String(e.message),
-      artists: "Revisa extractSearchItems",
+      name: "Error de lectura: " + String(e.message),
+      artists: "Fallo en extractSearchItems",
       album_name: "",
       duration_ms: 0,
       cover_url: "",
@@ -223,19 +230,16 @@ function download(trackId, quality, outputPath, progressCallback) {
 // -------------------------------------------------------------
 // resolveStream (cliente ANDROID_MUSIC = URLs directas, sin signatureCipher)
 // -------------------------------------------------------------
-
-// itags de audio-only comunes en YT:
-//  251 = opus ~160kbps (webm) | 140 = m4a AAC 128kbps | 250 = opus ~70k | 249 = opus ~50k
 const QUALITY_ITAGS = {
   OPUS_160: [251, 250, 249, 140],
-  MP3_320:  [140, 251, 250, 249]  // no hay mp3 nativo; bajamos m4a y la app transcodifica
+  MP3_320:  [140, 251, 250, 249]
 };
 
 function androidContext() {
   return {
     client: {
       clientName: "ANDROID_MUSIC",
-      clientVersion: "6.42.52",      // versión app YT Music Android (caduca, subir si da 403)
+      clientVersion: "6.42.52",      
       androidSdkVersion: 33,
       hl: "es",
       gl: settings.region || "AR"
@@ -254,7 +258,7 @@ function callPlayer(videoId) {
     headers: {
       "Content-Type": "application/json",
       "User-Agent": "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 13)",
-      "X-YouTube-Client-Name": "21",      // 21 = ANDROID_MUSIC
+      "X-YouTube-Client-Name": "21",      
       "X-YouTube-Client-Version": "6.42.52"
     },
     body: JSON.stringify({
@@ -292,7 +296,6 @@ function resolveStream(trackId, quality) {
     chosen = audio.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
   }
 
-  // ANDROID_MUSIC devuelve .url directa (sin signatureCipher)
   if (!chosen.url) throw new Error("formato sin URL directa (posible signatureCipher)");
 
   if (settings.debug) console.log("[ytmusic] itag", chosen.itag, chosen.mimeType, chosen.bitrate);
@@ -335,8 +338,8 @@ function fetchTrack(videoId) {
   return {
     id: vd.videoId || videoId,
     title: vd.title || "Unknown",
-    artist: vd.author || "",        // en YT Music suele ser el canal/artista
-    album: "",                       // el player endpoint no trae álbum; enriquecer aparte si hace falta
+    artist: vd.author || "",        
+    album: "",                       
     duration: parseInt(vd.lengthSeconds || "0", 10),
     thumbnail: thumbs.length ? thumbs[thumbs.length - 1].url : ""
   };
@@ -344,12 +347,21 @@ function fetchTrack(videoId) {
 
 // --- stubs para evitar crasheos de SpotiFLAC ---
 function getArtist(artistId) {
-  return { id: artistId, name: "Artista Desconocido", images: [] };
+  return { 
+    success: true, 
+    type: "artist", 
+    artist: { id: artistId, name: "Artista Desconocido", images: [] } 
+  };
 }
 
 function getAlbum(albumId) {
-  return { id: albumId, name: "Álbum Desconocido", artists: "", images: [] };
+  return { 
+    success: true, 
+    type: "album", 
+    album: { id: albumId, name: "Álbum Desconocido", artists: "", images: [] } 
+  };
 }
+
 // -------------------------------------------------------------
 // Registro
 // -------------------------------------------------------------
