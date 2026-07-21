@@ -31,7 +31,7 @@ function getYtcfg() {
 
   if (!key || !ver) {
     if (settings.debug) console.log("[ytmusic] no pude scrapear ytcfg");
-    return { key: null, clientVersion: "1.20240101.01.00" };
+    return { key: null, clientVersion: "1.20240715.01.00" };
   }
 
   const cfg = { key: key, clientVersion: ver, ts: Date.now() };
@@ -52,7 +52,7 @@ function ytmContext(cfg) {
 }
 
 // -------------------------------------------------------------
-// SEARCH (barra de búsqueda custom)
+// SEARCH (barra de búsqueda custom) - CON DEBUG EN RESULTADOS
 // -------------------------------------------------------------
 function customSearch(query, options) {
   const cfg = getYtcfg();
@@ -75,14 +75,50 @@ function customSearch(query, options) {
     })
   });
 
+  // 1. Si YouTube rechaza la conexión, mostramos el código HTTP
   if (res.status !== 200) {
-    if (settings.debug) console.log("[ytmusic] search HTTP", res.status);
     storage.remove("ytcfg"); // limpiá cache para reintentar limpio
-    return [];
+    return [{
+      id: "error_http",
+      name: "Error HTTP de YouTube: " + res.status,
+      artists: "Intenta buscar de nuevo (caché limpiado)",
+      album_name: "",
+      duration_ms: 0,
+      cover_url: "",
+      item_type: "track"
+    }];
   }
 
-  const data = JSON.parse(res.body);
-  return extractSearchItems(data).map(parseSongItem).filter(Boolean);
+  // 2. Si la conexión es exitosa pero falla al leer los datos de YouTube
+  try {
+    const data = JSON.parse(res.body);
+    const results = extractSearchItems(data).map(parseSongItem).filter(Boolean);
+    
+    // 3. Si YouTube no devolvió error, pero nuestra función no encontró canciones
+    if (results.length === 0) {
+       return [{
+          id: "error_empty",
+          name: "Resultados vacíos",
+          artists: "¿YouTube cambió el diseño HTML?",
+          album_name: "",
+          duration_ms: 0,
+          cover_url: "",
+          item_type: "track"
+       }];
+    }
+    
+    return results;
+  } catch (e) {
+    return [{
+      id: "error_parse",
+      name: "Error en el código: " + String(e.message),
+      artists: "Revisa extractSearchItems",
+      album_name: "",
+      duration_ms: 0,
+      cover_url: "",
+      item_type: "track"
+    }];
+  }
 }
 
 // --- navegar la respuesta (banca musicShelf e itemSection) ---
