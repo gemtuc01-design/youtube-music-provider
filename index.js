@@ -3,6 +3,26 @@
 const YTM_HOST = "https://music.youtube.com";
 const YTM_BASE = `${YTM_HOST}/youtubei/v1`;
 
+// AGREGAR ESTO: Declaramos la variable para evitar el ReferenceError
+const settings = {
+  debug: true,
+  region: "AR"
+};
+
+// -------------------------------------------------------------
+// Lifecycle
+// -------------------------------------------------------------
+function initialize() {
+  if (settings.debug) console.log("[ytmusic] initialized, region:", settings.region);
+  return { success: true };
+}
+
+// ... (el resto de tu código sigue exactamente igual, incluyendo el debug de customSearch)
+// ===== YouTube Music Provider =====
+
+const YTM_HOST = "https://music.youtube.com";
+const YTM_BASE = `${YTM_HOST}/youtubei/v1`;
+
 // -------------------------------------------------------------
 // Lifecycle
 // -------------------------------------------------------------
