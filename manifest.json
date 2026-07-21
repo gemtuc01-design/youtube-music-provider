@@ -1,0 +1,39 @@
+{
+  "name": "youtube-music-provider",
+  "displayName": "YouTube Music",
+  "version": "0.1.0",
+  "description": "YouTube Music metadata, search & download provider for SpotiFLAC Mobile.",
+  "author": "Marcos Hyt",
+  "homepage": "https://github.com/tuusuario/spotiflac-ytmusic",
+  "icon": "icon.png",
+  "type": ["metadata_provider", "download_provider"],
+  "minAppVersion": "3.0.1",
+
+  "permissions": {
+    "network": ["music.youtube.com", "*.youtube.com", "*.googlevideo.com", "youtu.be"],
+    "storage": true,
+    "file": true
+  },
+
+  "searchBehavior": {
+    "enabled": true,
+    "placeholder": "Buscar en YouTube Music...",
+    "primary": false,
+    "thumbnailRatio": "wide"
+  },
+
+  "urlHandler": {
+    "enabled": true,
+    "patterns": ["music.youtube.com", "youtube.com/watch", "youtu.be"]
+  },
+
+  "qualityOptions": [
+    { "id": "OPUS_160", "label": "Opus ~160kbps", "description": "Mejor calidad YT (webm/opus)" },
+    { "id": "MP3_320", "label": "MP3 320kbps", "description": "Transcodificado a MP3" }
+  ],
+
+  "settings": [
+    { "key": "region", "label": "Región", "type": "select", "options": ["US", "AR", "MX", "ES"], "default": "AR" },
+    { "key": "debug", "label": "Modo debug", "type": "boolean", "default": false }
+  ]
+}
