@@ -20,30 +20,7 @@ function cleanup() {
   return { success: true };
 }
 
-// -------------------------------------------------------------
-// Auto-config (InnerTube ytcfg) - scrapeada y cacheada 24h
-// -------------------------------------------------------------
-function getYtcfg() {
-  let cached = storage.get("ytcfg");
-  if (cached) {
-    const c = JSON.parse(cached);
-    if (Date.now() - (c.ts || 0) < 86400000 && c.key && c.clientVersion) return c;
-  }
 
-  const html = http.get(`${YTM_HOST}/`).body;
-  const key = (html.match(/"INNERTUBE_API_KEY":"([^"]+)"/) || [])[1];
-  const ver = (html.match(/"INNERTUBE_CLIENT_VERSION":"([^"]+)"/) || [])[1];
-
-  if (!key || !ver) {
-    if (settings.debug) console.log("[ytmusic] no pude scrapear ytcfg");
-    return { key: null, clientVersion: "1.20240715.01.00" };
-  }
-
-  const cfg = { key: key, clientVersion: ver, ts: Date.now() };
-  storage.set("ytcfg", JSON.stringify(cfg));
-  if (settings.debug) console.log("[ytmusic] ytcfg ok", ver);
-  return cfg;
-}
 
 function ytmContext(cfg) {
   return {
@@ -56,7 +33,35 @@ function ytmContext(cfg) {
   };
 }
 
+// -------------------------------------------------------------// -------------------------------------------------------------
+// Auto-config (InnerTube ytcfg) - scrapeada y cacheada 24h
 // -------------------------------------------------------------
+function getYtcfg() {
+  let cached = storage.get("ytcfg");
+  if (cached) {
+    const c = JSON.parse(cached);
+    if (Date.now() - (c.ts || 0) < 86400000 && c.key && c.clientVersion) return c;
+  }
+
+  const html = http.get(`${YTM_HOST}/`).body;
+  // Usamos expresiones regulares más flexibles para evitar fallos de lectura
+  const keyMatch = html.match(/"INNERTUBE_API_KEY"\s*:\s*"([^"]+)"/);
+  const verMatch = html.match(/"INNERTUBE_CLIENT_VERSION"\s*:\s*"([^"]+)"/);
+  
+  const key = keyMatch ? keyMatch[1] : null;
+  const ver = verMatch ? verMatch[1] : null;
+
+  if (!key || !ver) {
+    if (settings.debug) console.log("[ytmusic] no pude scrapear ytcfg");
+    // Actualizamos la versión de rescate al año 2026
+    return { key: null, clientVersion: "1.20260715.01.00" };
+  }
+
+  const cfg = { key: key, clientVersion: ver, ts: Date.now() };
+  storage.set("ytcfg", JSON.stringify(cfg));
+  if (settings.debug) console.log("[ytmusic] ytcfg ok", ver);
+  return cfg;
+}
 // SEARCH (barra de búsqueda custom) - CON DEBUG EN RESULTADOS
 // -------------------------------------------------------------
 function customSearch(query, options) {
@@ -330,6 +335,14 @@ function fetchTrack(videoId) {
   };
 }
 
+// --- stubs para evitar crasheos de SpotiFLAC ---
+function getArtist(artistId) {
+  return { id: artistId, name: "Artista Desconocido", images: [] };
+}
+
+function getAlbum(albumId) {
+  return { id: albumId, name: "Álbum Desconocido", artists: "", images: [] };
+}
 // -------------------------------------------------------------
 // Registro
 // -------------------------------------------------------------
@@ -338,5 +351,7 @@ registerExtension({
   cleanup: cleanup,
   customSearch: customSearch,
   handleURL: handleURL,
-  download: download
+  download: download,
+  getArtist: getArtist,
+  getAlbum: getAlbum
 });
