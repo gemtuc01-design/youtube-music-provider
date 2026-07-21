@@ -33,7 +33,7 @@ function ytmContext(cfg) {
   };
 }
 
-// -------------------------------------------------------------// -------------------------------------------------------------
+// -------------------------------------------------------------
 // Auto-config (InnerTube ytcfg) - scrapeada y cacheada 24h
 // -------------------------------------------------------------
 function getYtcfg() {
@@ -43,8 +43,15 @@ function getYtcfg() {
     if (Date.now() - (c.ts || 0) < 86400000 && c.key && c.clientVersion) return c;
   }
 
-  const html = http.get(`${YTM_HOST}/`).body;
-  // Usamos expresiones regulares más flexibles para evitar fallos de lectura
+  // 1. Agregamos un User-Agent para que YouTube no bloquee la lectura de la web
+  const res = http.get(`${YTM_HOST}/`, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+    }
+  });
+  const html = res.body || "";
+
+  // 2. Buscamos las credenciales
   const keyMatch = html.match(/"INNERTUBE_API_KEY"\s*:\s*"([^"]+)"/);
   const verMatch = html.match(/"INNERTUBE_CLIENT_VERSION"\s*:\s*"([^"]+)"/);
   
@@ -53,8 +60,8 @@ function getYtcfg() {
 
   if (!key || !ver) {
     if (settings.debug) console.log("[ytmusic] no pude scrapear ytcfg");
-    // Actualizamos la versión de rescate al año 2026
-    return { key: null, clientVersion: "1.20260715.01.00" };
+    // 3. Usamos una versión REAL y validada por YouTube, no una inventada
+    return { key: null, clientVersion: "1.20240513.01.00" };
   }
 
   const cfg = { key: key, clientVersion: ver, ts: Date.now() };
