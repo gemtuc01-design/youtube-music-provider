@@ -41,7 +41,6 @@ function getYtcfg() {
     if (Date.now() - (c.ts || 0) < 86400000 && c.key && c.clientVersion) return c;
   }
 
-  // 1. Agregamos un User-Agent para que YouTube no bloquee la lectura de la web
   const res = http.get(`${YTM_HOST}/`, {
     headers: {
       "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
@@ -49,7 +48,6 @@ function getYtcfg() {
   });
   const html = res.body || "";
 
-  // 2. Buscamos las credenciales
   const keyMatch = html.match(/"INNERTUBE_API_KEY"\s*:\s*"([^"]+)"/);
   const verMatch = html.match(/"INNERTUBE_CLIENT_VERSION"\s*:\s*"([^"]+)"/);
   
@@ -57,8 +55,7 @@ function getYtcfg() {
   const ver = verMatch ? verMatch[1] : null;
 
   if (!key || !ver) {
-    if (settings.debug) console.log("[ytmusic] no pude scrapear ytcfg");
-    // 3. Usamos una versión REAL y validada por YouTube
+    if (settings.debug) console.log("[ytmusic] no pude scrapear ytcfg, usando fallback");
     return { key: null, clientVersion: "1.20240513.01.00" };
   }
 
@@ -74,21 +71,10 @@ function getYtcfg() {
 function customSearch(query, options) {
   const cfg = getYtcfg();
   
-  // Validamos si la clave se obtuvo correctamente
-  if (!cfg.key) {
-    storage.remove("ytcfg");
-    return [{
-      id: "error_nokey",
-      name: "Fallo al obtener API Key",
-      artists: "Revisa el scraping de getYtcfg",
-      album_name: "",
-      duration_ms: 0,
-      cover_url: "",
-      item_type: "track"
-    }];
-  }
-
-  const url = `${YTM_BASE}/search?key=${cfg.key}&prettyPrint=false`;
+  // ELIMINAMOS EL BLOQUEO: Permitimos que la búsqueda proceda aunque no haya API Key
+  const url = cfg.key
+    ? `${YTM_BASE}/search?key=${cfg.key}&prettyPrint=false`
+    : `${YTM_BASE}/search?prettyPrint=false`; // InnerTube banca sin key
 
   const res = http.post(url, {
     headers: {
@@ -102,7 +88,6 @@ function customSearch(query, options) {
     body: JSON.stringify({
       context: ytmContext(cfg),
       query: query,
-      // Corregimos el parámetro de búsqueda para evitar el error 400
       params: "EgWKAQIIAWoKEAkQBRAKEAMQBA==" 
     })
   });
