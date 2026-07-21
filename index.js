@@ -41,27 +41,30 @@ function getYtcfg() {
     if (Date.now() - (c.ts || 0) < 86400000 && c.key && c.clientVersion) return c;
   }
 
-  const res = http.get(`${YTM_HOST}/`, {
-    headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-    }
-  });
-  const html = res.body || "";
+  // 1er Intento: Scrapear YouTube Music
+  let html = http.get(`${YTM_HOST}/`).body || "";
+  
+  // Expresiones regulares ultra-flexibles
+  let keyMatch = html.match(/["']?INNERTUBE_API_KEY["']?\s*[:=]\s*["']([^"']+)["']/);
+  let verMatch = html.match(/["']?INNERTUBE_CLIENT_VERSION["']?\s*[:=]\s*["']([^"']+)["']/);
 
-  const keyMatch = html.match(/"INNERTUBE_API_KEY"\s*:\s*"([^"]+)"/);
-  const verMatch = html.match(/"INNERTUBE_CLIENT_VERSION"\s*:\s*"([^"]+)"/);
+  // 2do Intento: Si falla YTM, intentamos con el YouTube normal
+  if (!keyMatch) {
+    html = http.get("https://www.youtube.com/").body || "";
+    keyMatch = html.match(/["']?INNERTUBE_API_KEY["']?\s*[:=]\s*["']([^"']+)["']/);
+    if (!verMatch) verMatch = html.match(/["']?INNERTUBE_CLIENT_VERSION["']?\s*[:=]\s*["']([^"']+)["']/);
+  }
   
   const key = keyMatch ? keyMatch[1] : null;
   const ver = verMatch ? verMatch[1] : null;
 
-  if (!key || !ver) {
-    if (settings.debug) console.log("[ytmusic] no pude scrapear ytcfg, usando fallback");
-    return { key: null, clientVersion: "1.20240513.01.00" };
-  }
-
-  const cfg = { key: key, clientVersion: ver, ts: Date.now() };
+  const cfg = { 
+    key: key, 
+    clientVersion: ver || "1.20240513.01.00", 
+    ts: Date.now() 
+  };
+  
   storage.set("ytcfg", JSON.stringify(cfg));
-  if (settings.debug) console.log("[ytmusic] ytcfg ok", ver);
   return cfg;
 }
 
@@ -71,10 +74,9 @@ function getYtcfg() {
 function customSearch(query, options) {
   const cfg = getYtcfg();
   
-  // ELIMINAMOS EL BLOQUEO: Permitimos que la búsqueda proceda aunque no haya API Key
   const url = cfg.key
     ? `${YTM_BASE}/search?key=${cfg.key}&prettyPrint=false`
-    : `${YTM_BASE}/search?prettyPrint=false`; // InnerTube banca sin key
+    : `${YTM_BASE}/search?prettyPrint=false`;
 
   const res = http.post(url, {
     headers: {
@@ -87,17 +89,17 @@ function customSearch(query, options) {
     },
     body: JSON.stringify({
       context: ytmContext(cfg),
-      query: query,
-      params: "EgWKAQIIAWoKEAkQBRAKEAMQBA==" 
+      query: query
+      // Eliminamos el 'params' de filtro para evitar el Error 400
     })
   });
 
   if (res.status !== 200) {
-    storage.remove("ytcfg");
+    storage.remove("ytcfg"); 
     return [{
       id: "error_http",
-      name: "Error HTTP de YouTube: " + res.status,
-      artists: "Bloqueado en la petición POST",
+      name: "Error HTTP POST: " + res.status,
+      artists: "Key obtenida: " + (cfg.key ? "SÍ" : "NO") + " | Intenta otra vez",
       album_name: "",
       duration_ms: 0,
       cover_url: "",
