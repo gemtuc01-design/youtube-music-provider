@@ -1,7 +1,7 @@
 {
   "name": "youtube-music-provider",
   "displayName": "YouTube Music",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "YouTube Music metadata, search & download provider for SpotiFLAC Mobile.",
   "author": "Marcos Hyt",
   "homepage": "https://github.com/gemtuc01-design/youtube-music-provider",
